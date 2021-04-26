@@ -14,6 +14,7 @@ import path from 'path';
 import { app, BrowserWindow, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
+import { fork } from 'child_process';
 import MenuBuilder from './menu';
 
 export default class AppUpdater {
@@ -91,6 +92,10 @@ const createWindow = async () => {
       mainWindow.show();
       mainWindow.focus();
     }
+    mainWindow.webContents.send('message', {
+      method: 'info',
+      result: __dirname,
+    });
   });
 
   mainWindow.on('closed', () => {
@@ -104,6 +109,17 @@ const createWindow = async () => {
   mainWindow.webContents.on('new-window', (event, url) => {
     event.preventDefault();
     shell.openExternal(url);
+  });
+
+  const bgprocess = fork(path.join(__dirname, 'child.js'), [app.getVersion()], {
+    stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+  });
+
+  bgprocess.on('message', (data) => {
+    console.log(data);
+    if (mainWindow) {
+      mainWindow.webContents.send('message', data);
+    }
   });
 
   // Remove this if your app does not use auto updates
